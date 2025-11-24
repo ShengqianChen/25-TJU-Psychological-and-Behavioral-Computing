@@ -144,7 +144,8 @@ hyp_params.dataset = dataset
 hyp_params.when = args.when
 hyp_params.batch_chunk = args.batch_chunk
 hyp_params.n_train, hyp_params.n_valid, hyp_params.n_test = len(train_data), len(valid_data), len(test_data)
-hyp_params.model = str.upper(args.model.strip())
+# 对于Improved模型，保持首字母大写格式（MULTModelImproved）
+hyp_params.model = args.model.strip() if 'Improved' in args.model.strip() else str.upper(args.model.strip())
 hyp_params.output_dim = output_dim_dict.get(dataset, 1)
 hyp_params.criterion = criterion_dict.get(dataset, 'L1Loss')
 
@@ -156,15 +157,11 @@ hyp_params.criterion = criterion_dict.get(dataset, 'L1Loss')
 ####################################################################
 
 def initiate_improved(hyp_params, train_loader, valid_loader, test_loader):
-    """
-    Modified initiate function that uses the improved model from models_improved
-    """
     from src import models_improved
     from torch import optim, nn
     from torch.optim.lr_scheduler import ReduceLROnPlateau
     
-    # Create model instance using improved model
-    model = getattr(models_improved, hyp_params.model+'Model')(hyp_params)
+    model = models_improved.MULTModelImproved(hyp_params)
 
     if hyp_params.use_cuda:
         model = model.cuda()
@@ -172,7 +169,6 @@ def initiate_improved(hyp_params, train_loader, valid_loader, test_loader):
     optimizer = getattr(optim, hyp_params.optim)(model.parameters(), lr=hyp_params.lr)
     criterion = getattr(nn, hyp_params.criterion)()
     
-    # CTC modules not needed for MulT
     ctc_criterion = None
     ctc_a2l_module, ctc_v2l_module = None, None
     ctc_a2l_optimizer, ctc_v2l_optimizer = None, None

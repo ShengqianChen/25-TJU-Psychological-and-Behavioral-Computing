@@ -1,7 +1,4 @@
-"""
-Enhanced training script with logging functionality
-在原始train.py基础上添加训练日志记录功能
-"""
+"""带日志记录的训练脚本"""
 
 import torch
 from torch import nn
@@ -24,27 +21,21 @@ from src.eval_metrics import *
 from src.training_logger import TrainingLogger
 
 
-####################################################################
-#
-# Construct the model and the CTC module (which may not be needed)
-#
-####################################################################
-
 def get_CTC_module(hyp_params):
     a2l_module = getattr(ctc, 'CTCModule')(in_dim=hyp_params.orig_d_a, out_seq_len=hyp_params.l_len)
     v2l_module = getattr(ctc, 'CTCModule')(in_dim=hyp_params.orig_d_v, out_seq_len=hyp_params.l_len)
     return a2l_module, v2l_module
 
 def initiate(hyp_params, train_loader, valid_loader, test_loader):
-    # 根据模型名称选择对应的模块
-    if 'Improved' in hyp_params.model:
+    if 'Improved' in hyp_params.model or 'IMPROVED' in hyp_params.model.upper():
         from src import models_improved as model_module
-    elif 'Baseline' in hyp_params.model:
+        model = model_module.MULTModelImproved(hyp_params)
+    elif 'Baseline' in hyp_params.model or 'BASELINE' in hyp_params.model.upper():
         from src import models_baseline as model_module
+        model = model_module.BaselineModel(hyp_params)
     else:
         from src import models as model_module
-    
-    model = getattr(model_module, hyp_params.model+'Model')(hyp_params)
+        model = getattr(model_module, hyp_params.model+'Model')(hyp_params)
 
     if hyp_params.use_cuda:
         model = model.cuda()
@@ -77,31 +68,16 @@ def initiate(hyp_params, train_loader, valid_loader, test_loader):
     return train_model(settings, hyp_params, train_loader, valid_loader, test_loader)
 
 
-####################################################################
-#
-# Training and evaluation scripts with logging
-#
-####################################################################
-
 def compute_metrics(results, truths, dataset):
-    """
-    计算评估指标（用于日志记录）
-    
-    Returns:
-        dict: 包含各种指标的字典
-    """
     metrics = {}
     
     if dataset in ['mosi', 'mosei_senti']:
-        # 回归任务
         test_preds = results.view(-1).cpu().detach().numpy()
         test_truth = truths.view(-1).cpu().detach().numpy()
-        
         non_zeros = np.array([i for i, e in enumerate(test_truth) if e != 0])
         
         mae = np.mean(np.absolute(test_preds - test_truth))
         corr = np.corrcoef(test_preds, test_truth)[0][1] if len(test_preds) > 1 else 0.0
-        
         metrics['mae'] = mae
         metrics['corr'] = corr
         
@@ -111,18 +87,14 @@ def compute_metrics(results, truths, dataset):
             metrics['acc'] = accuracy_score(binary_truth, binary_preds)
     
     elif dataset == 'iemocap':
-        # 分类任务
         test_preds = results.view(-1, 4, 2).cpu().detach().numpy()
         test_truth = truths.view(-1, 4).cpu().detach().numpy()
-        
-        # 计算平均准确率
         accs = []
         for emo_ind in range(4):
             test_preds_i = np.argmax(test_preds[:,emo_ind], axis=1)
             test_truth_i = test_truth[:,emo_ind]
             acc = accuracy_score(test_truth_i, test_preds_i)
             accs.append(acc)
-        
         metrics['acc'] = np.mean(accs)
     
     return metrics
@@ -141,7 +113,6 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
     
     scheduler = settings['scheduler']
     
-    # ========== 初始化训练日志记录器 ==========
     logger = TrainingLogger(log_dir='training_logs', experiment_name=hyp_params.name)
     print(f"Training logger initialized: {logger.log_path}")
 
@@ -294,15 +265,11 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
         val_loss, val_results, val_truths = evaluate(model, ctc_a2l_module, ctc_v2l_module, criterion, test=False)
         test_loss, test_results, test_truths = evaluate(model, ctc_a2l_module, ctc_v2l_module, criterion, test=True)
         
-        # ========== 计算指标并记录日志 ==========
-        train_metrics = {}  # 训练集指标（通常不计算，因为计算量大）
+        train_metrics = {}
         val_metrics = compute_metrics(val_results, val_truths, hyp_params.dataset)
         test_metrics = compute_metrics(test_results, test_truths, hyp_params.dataset)
-        
-        # 获取当前学习率
         current_lr = optimizer.param_groups[0]['lr']
         
-        # 记录日志
         logger.log_epoch(
             epoch=epoch,
             train_loss=train_loss,

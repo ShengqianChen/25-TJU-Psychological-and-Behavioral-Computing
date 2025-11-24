@@ -1,7 +1,4 @@
-"""
-训练可视化脚本
-用于绘制训练曲线、对比不同模型的性能等
-"""
+"""训练可视化脚本"""
 
 import json
 import os
@@ -11,22 +8,12 @@ from pathlib import Path
 
 
 def load_training_log(log_path):
-    """加载训练日志"""
     with open(log_path, 'r') as f:
         return json.load(f)
 
 
 def plot_training_curves(log_paths, labels, save_path='training_curves.png', 
                          metrics=['train_loss', 'val_loss', 'test_loss']):
-    """
-    绘制训练曲线
-    
-    Args:
-        log_paths: 日志文件路径列表
-        labels: 模型标签列表
-        save_path: 保存路径
-        metrics: 要绘制的指标列表
-    """
     plt.figure(figsize=(15, 5))
     
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
@@ -65,15 +52,6 @@ def plot_training_curves(log_paths, labels, save_path='training_curves.png',
 
 def plot_metric_comparison(log_paths, labels, metric='val_loss', 
                            save_path='metric_comparison.png'):
-    """
-    对比不同模型在某个指标上的表现
-    
-    Args:
-        log_paths: 日志文件路径列表
-        labels: 模型标签列表
-        metric: 要对比的指标
-        save_path: 保存路径
-    """
     plt.figure(figsize=(10, 6))
     
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
@@ -104,15 +82,6 @@ def plot_metric_comparison(log_paths, labels, metric='val_loss',
 
 def plot_final_metrics_comparison(log_paths, labels, metrics=['val_loss', 'test_loss', 'val_mae', 'test_mae'],
                                   save_path='final_metrics_comparison.png'):
-    """
-    对比不同模型的最终指标
-    
-    Args:
-        log_paths: 日志文件路径列表
-        labels: 模型标签列表
-        metrics: 要对比的指标列表
-        save_path: 保存路径
-    """
     # 收集数据
     data = {label: [] for label in labels}
     metric_labels = []
@@ -170,14 +139,6 @@ def plot_final_metrics_comparison(log_paths, labels, metrics=['val_loss', 'test_
 
 
 def plot_model_comparison_table(log_paths, labels, save_path='model_comparison_table.png'):
-    """
-    创建模型对比表格（可视化）
-    
-    Args:
-        log_paths: 日志文件路径列表
-        labels: 模型标签列表
-        save_path: 保存路径
-    """
     import pandas as pd
     
     # 收集所有指标
@@ -230,13 +191,6 @@ def plot_model_comparison_table(log_paths, labels, save_path='model_comparison_t
 
 
 def visualize_all(log_dir='training_logs', output_dir='visualizations'):
-    """
-    自动可视化所有训练日志
-    
-    Args:
-        log_dir: 日志目录
-        output_dir: 输出目录
-    """
     os.makedirs(output_dir, exist_ok=True)
     
     # 查找所有日志文件
