@@ -5,10 +5,12 @@ import os
 from scipy import signal
 import torch
 
-if torch.cuda.is_available():
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
-else:
-    torch.set_default_tensor_type('torch.FloatTensor')
+# Note: set_default_tensor_type is deprecated in PyTorch 2.1+
+# The code will work without it as tensors are explicitly moved to device
+# if torch.cuda.is_available():
+#     torch.set_default_tensor_type('torch.cuda.FloatTensor')
+# else:
+#     torch.set_default_tensor_type('torch.FloatTensor')
     
 ############################################################################################
 # This file provides basic processing script for the multimodal datasets we use. For other

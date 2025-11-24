@@ -1,0 +1,46 @@
+# Data directories
+data/
+pre_trained_models/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# PyTorch model files
+*.pt
+*.pth
+*.pkl
+
+# Data cache files
+*.dt
+
+# macOS
+.DS_Store
+__MACOSX/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment
+venv/
+env/
+ENV/
+.venv
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
