@@ -36,9 +36,12 @@ class MULTModelImproved(nn.Module):
         output_dim = hyp_params.output_dim
 
         # 投影层
-        self.proj_l = nn.Conv1d(self.orig_d_l, self.d_l, kernel_size=1, padding=0, bias=False)
-        self.proj_a = nn.Conv1d(self.orig_d_a, self.d_a, kernel_size=1, padding=0, bias=False)
-        self.proj_v = nn.Conv1d(self.orig_d_v, self.d_v, kernel_size=1, padding=0, bias=False)
+        k_l = getattr(hyp_params, 'kernel_size_l', 1)
+        k_v = getattr(hyp_params, 'kernel_size_v', 1)
+        k_a = getattr(hyp_params, 'kernel_size_a', 1)
+        self.proj_l = nn.Conv1d(self.orig_d_l, self.d_l, kernel_size=k_l, padding=max(k_l - 1, 0) // 2, bias=False)
+        self.proj_a = nn.Conv1d(self.orig_d_a, self.d_a, kernel_size=k_a, padding=max(k_a - 1, 0) // 2, bias=False)
+        self.proj_v = nn.Conv1d(self.orig_d_v, self.d_v, kernel_size=k_v, padding=max(k_v - 1, 0) // 2, bias=False)
 
         # 跨模态注意力
         if self.lonly:

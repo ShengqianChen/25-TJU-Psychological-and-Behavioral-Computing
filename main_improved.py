@@ -41,6 +41,12 @@ parser.add_argument('--res_dropout', type=float, default=0.1,
                     help='residual block dropout')
 parser.add_argument('--out_dropout', type=float, default=0.0,
                     help='output layer dropout')
+parser.add_argument('--kernel_size_l', type=int, default=1,
+                    help='temporal conv kernel size for text (default: 1)')
+parser.add_argument('--kernel_size_v', type=int, default=1,
+                    help='temporal conv kernel size for vision (default: 1)')
+parser.add_argument('--kernel_size_a', type=int, default=1,
+                    help='temporal conv kernel size for audio (default: 1)')
 
 # Architecture
 parser.add_argument('--nlevels', type=int, default=5,
@@ -87,6 +93,13 @@ elif valid_partial_mode != 1:
     raise ValueError("You can only choose one of {l/v/a}only.")
 
 use_cuda = False
+
+if dataset == 'iemocap':
+    args.num_heads = 10
+    args.kernel_size_l = 3
+    args.kernel_size_v = 3
+    args.kernel_size_a = 5
+    args.res_dropout = 0.25
 
 output_dim_dict = {
     'mosi': 1,
