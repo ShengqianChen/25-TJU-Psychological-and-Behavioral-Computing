@@ -2,7 +2,7 @@ import torch
 import argparse
 from src.utils import *
 from torch.utils.data import DataLoader
-from src import train
+from src import train_with_logging as train
 
 
 parser = argparse.ArgumentParser(description='MOSEI Sentiment Analysis')
