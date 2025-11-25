@@ -47,12 +47,18 @@ parser.add_argument('--kernel_size_v', type=int, default=1,
                     help='temporal conv kernel size for vision (default: 1)')
 parser.add_argument('--kernel_size_a', type=int, default=1,
                     help='temporal conv kernel size for audio (default: 1)')
+parser.add_argument('--d_l', type=int, default=30,
+                    help='hidden dimension for text (default: 30)')
+parser.add_argument('--d_a', type=int, default=30,
+                    help='hidden dimension for audio (default: 30)')
+parser.add_argument('--d_v', type=int, default=30,
+                    help='hidden dimension for vision (default: 30)')
 
 # Architecture
 parser.add_argument('--nlevels', type=int, default=5,
                     help='number of layers in the network (default: 5)')
-parser.add_argument('--num_heads', type=int, default=5,
-                    help='number of heads for the transformer network (default: 5)')
+parser.add_argument('--num_heads', type=int, default=10,
+                    help='number of heads for the transformer network (default: 10)')
 parser.add_argument('--attn_mask', action='store_false',
                     help='use attention mask for Transformer (default: true)')
 
@@ -99,6 +105,8 @@ if dataset == 'iemocap':
     args.kernel_size_l = 3
     args.kernel_size_v = 3
     args.kernel_size_a = 5
+    args.embed_dropout = 0.3
+    args.attn_dropout = 0.25
     args.res_dropout = 0.25
 
 output_dim_dict = {

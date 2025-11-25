@@ -6,11 +6,15 @@ from modules.transformer import TransformerEncoder
 
 
 class MULTModelImproved(nn.Module):
-    """改进版MulT，加了模态权重融合"""
     def __init__(self, hyp_params):
+        """
+        Construct a MulT model.
+        """
         super(MULTModelImproved, self).__init__()
         self.orig_d_l, self.orig_d_a, self.orig_d_v = hyp_params.orig_d_l, hyp_params.orig_d_a, hyp_params.orig_d_v
-        self.d_l, self.d_a, self.d_v = 30, 30, 30
+        self.d_l = getattr(hyp_params, 'd_l', 30)
+        self.d_a = getattr(hyp_params, 'd_a', 30)
+        self.d_v = getattr(hyp_params, 'd_v', 30)
         self.vonly = hyp_params.vonly
         self.aonly = hyp_params.aonly
         self.lonly = hyp_params.lonly
@@ -33,9 +37,9 @@ class MULTModelImproved(nn.Module):
         else:
             combined_dim = 2 * (self.d_l + self.d_a + self.d_v)
         
-        output_dim = hyp_params.output_dim
+        output_dim = hyp_params.output_dim        # This is actually not a hyperparameter :-)
 
-        # 投影层
+        # 1. Temporal convolutional layers
         k_l = getattr(hyp_params, 'kernel_size_l', 1)
         k_v = getattr(hyp_params, 'kernel_size_v', 1)
         k_a = getattr(hyp_params, 'kernel_size_a', 1)
@@ -43,7 +47,7 @@ class MULTModelImproved(nn.Module):
         self.proj_a = nn.Conv1d(self.orig_d_a, self.d_a, kernel_size=k_a, padding=max(k_a - 1, 0) // 2, bias=False)
         self.proj_v = nn.Conv1d(self.orig_d_v, self.d_v, kernel_size=k_v, padding=max(k_v - 1, 0) // 2, bias=False)
 
-        # 跨模态注意力
+        # 2. Crossmodal Attentions
         if self.lonly:
             self.trans_l_with_a = self.get_network(self_type='la')
             self.trans_l_with_v = self.get_network(self_type='lv')
@@ -54,25 +58,24 @@ class MULTModelImproved(nn.Module):
             self.trans_v_with_l = self.get_network(self_type='vl')
             self.trans_v_with_a = self.get_network(self_type='va')
         
-        # 自注意力
+        # 3. Self Attentions (Could be replaced by LSTMs, GRUs, etc.)
+        #    [e.g., self.trans_x_mem = nn.LSTM(self.d_x, self.d_x, 1)
         self.trans_l_mem = self.get_network(self_type='l_mem', layers=3)
         self.trans_a_mem = self.get_network(self_type='a_mem', layers=3)
         self.trans_v_mem = self.get_network(self_type='v_mem', layers=3)
        
-        # 输出层
+        # Projection layers
         self.proj1 = nn.Linear(combined_dim, combined_dim)
         self.proj2 = nn.Linear(combined_dim, combined_dim)
-        self.out_layer = nn.Linear(combined_dim, output_dim)
-        
-        # 模态权重融合（改进点）
-        if self.partial_mode == 3:
-            modal_dim = 2 * self.d_l
-            self.modal_weight_net = nn.Sequential(
-                nn.Linear(modal_dim, modal_dim // 2),
-                nn.ReLU(),
-                nn.Dropout(self.embed_dropout),
-                nn.Linear(modal_dim // 2, 1)
-            )
+        self.out_layer = nn.Sequential(
+            nn.Linear(combined_dim, combined_dim * 2),
+            nn.ReLU(),
+            nn.Dropout(self.out_dropout),
+            nn.Linear(combined_dim * 2, combined_dim),
+            nn.ReLU(),
+            nn.Dropout(self.out_dropout),
+            nn.Linear(combined_dim, output_dim)
+        )
 
     def get_network(self, self_type='l', layers=-1):
         if self_type in ['l', 'al', 'vl']:
@@ -99,11 +102,15 @@ class MULTModelImproved(nn.Module):
                                   embed_dropout=self.embed_dropout,
                                   attn_mask=self.attn_mask)
             
-    def forward(self, x_l, x_a, x_v, return_weights=False):
+    def forward(self, x_l, x_a, x_v):
+        """
+        text, audio, and vision should have dimension [batch_size, seq_len, n_features]
+        """
         x_l = F.dropout(x_l.transpose(1, 2), p=self.embed_dropout, training=self.training)
         x_a = x_a.transpose(1, 2)
         x_v = x_v.transpose(1, 2)
        
+        # Project the textual/visual/audio features
         proj_x_l = x_l if self.orig_d_l == self.d_l else self.proj_l(x_l)
         proj_x_a = x_a if self.orig_d_a == self.d_a else self.proj_a(x_a)
         proj_x_v = x_v if self.orig_d_v == self.d_v else self.proj_v(x_v)
@@ -112,15 +119,17 @@ class MULTModelImproved(nn.Module):
         proj_x_l = proj_x_l.permute(2, 0, 1)
 
         if self.lonly:
-            h_l_with_as = self.trans_l_with_a(proj_x_l, proj_x_a, proj_x_a)
-            h_l_with_vs = self.trans_l_with_v(proj_x_l, proj_x_v, proj_x_v)
+            # (V,A) --> L
+            h_l_with_as = self.trans_l_with_a(proj_x_l, proj_x_a, proj_x_a)    # Dimension (L, N, d_l)
+            h_l_with_vs = self.trans_l_with_v(proj_x_l, proj_x_v, proj_x_v)    # Dimension (L, N, d_l)
             h_ls = torch.cat([h_l_with_as, h_l_with_vs], dim=2)
             h_ls = self.trans_l_mem(h_ls)
             if type(h_ls) == tuple:
                 h_ls = h_ls[0]
-            last_h_l = last_hs = h_ls[-1]
+            last_h_l = last_hs = h_ls[-1]   # Take the last output for prediction
 
         if self.aonly:
+            # (L,V) --> A
             h_a_with_ls = self.trans_a_with_l(proj_x_a, proj_x_l, proj_x_l)
             h_a_with_vs = self.trans_a_with_v(proj_x_a, proj_x_v, proj_x_v)
             h_as = torch.cat([h_a_with_ls, h_a_with_vs], dim=2)
@@ -130,6 +139,7 @@ class MULTModelImproved(nn.Module):
             last_h_a = last_hs = h_as[-1]
 
         if self.vonly:
+            # (L,A) --> V
             h_v_with_ls = self.trans_v_with_l(proj_x_v, proj_x_l, proj_x_l)
             h_v_with_as = self.trans_v_with_a(proj_x_v, proj_x_a, proj_x_a)
             h_vs = torch.cat([h_v_with_ls, h_v_with_as], dim=2)
@@ -139,23 +149,11 @@ class MULTModelImproved(nn.Module):
             last_h_v = last_hs = h_vs[-1]
         
         if self.partial_mode == 3:
-            # 模态权重融合
-            weight_l = self.modal_weight_net(last_h_l)
-            weight_a = self.modal_weight_net(last_h_a)
-            weight_v = self.modal_weight_net(last_h_v)
-            modal_weights = torch.softmax(torch.cat([weight_l, weight_a, weight_v], dim=1), dim=1)
-            weighted_l = last_h_l * modal_weights[:, 0:1]
-            weighted_a = last_h_a * modal_weights[:, 1:2]
-            weighted_v = last_h_v * modal_weights[:, 2:3]
-            last_hs = torch.cat([weighted_l, weighted_a, weighted_v], dim=1)
-        else:
-            modal_weights = None
+            last_hs = torch.cat([last_h_l, last_h_a, last_h_v], dim=1)
         
+        # A residual block
         last_hs_proj = self.proj2(F.dropout(F.relu(self.proj1(last_hs)), p=self.out_dropout, training=self.training))
         last_hs_proj += last_hs
-        output = self.out_layer(last_hs_proj)
         
-        if return_weights:
-            return output, last_hs, modal_weights
+        output = self.out_layer(last_hs_proj)
         return output, last_hs
-

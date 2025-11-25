@@ -190,21 +190,44 @@ def plot_model_comparison_table(log_paths, labels, save_path='model_comparison_t
     plt.close()
 
 
-def visualize_all(log_dir='training_logs', output_dir='visualizations'):
+def visualize_all(log_dir='training_logs', output_dir='visualizations', log_files=None):
     os.makedirs(output_dir, exist_ok=True)
     
-    # 查找所有日志文件
-    log_files = list(Path(log_dir).glob('*.json'))
+    # 如果指定了特定的日志文件，使用它们；否则查找所有日志文件
+    if log_files is not None:
+        # 处理相对路径和绝对路径
+        log_paths = []
+        for log_file in log_files:
+            if os.path.isabs(log_file):
+                log_paths.append(log_file)
+            elif os.path.exists(log_file):
+                log_paths.append(os.path.abspath(log_file))
+            elif os.path.exists(os.path.join(log_dir, log_file)):
+                log_paths.append(os.path.join(log_dir, log_file))
+            else:
+                print(f"Warning: {log_file} not found, skipping...")
+        
+        # 从路径中提取标签（文件名，不含扩展名）
+        labels = [os.path.splitext(os.path.basename(p))[0] for p in log_paths]
+    else:
+        # 查找所有日志文件
+        log_files_list = list(Path(log_dir).glob('*.json'))
+        
+        if len(log_files_list) == 0:
+            print(f"No training logs found in {log_dir}")
+            return
+        
+        # 提取模型名称
+        log_paths = [str(f) for f in log_files_list]
+        labels = [f.stem for f in log_files_list]
     
-    if len(log_files) == 0:
-        print(f"No training logs found in {log_dir}")
+    if len(log_paths) == 0:
+        print("No valid training logs to visualize")
         return
     
-    # 提取模型名称
-    log_paths = [str(f) for f in log_files]
-    labels = [f.stem for f in log_files]
-    
-    print(f"Found {len(log_paths)} training logs")
+    print(f"Visualizing {len(log_paths)} training logs:")
+    for path, label in zip(log_paths, labels):
+        print(f"  - {label}: {path}")
     
     # 绘制各种图表
     plot_training_curves(log_paths, labels, 
@@ -231,8 +254,11 @@ if __name__ == '__main__':
                        help='Directory containing training logs')
     parser.add_argument('--output_dir', type=str, default='visualizations',
                        help='Output directory for visualizations')
+    parser.add_argument('--log_files', type=str, nargs='+', default=None,
+                       help='Specific log files to visualize (e.g., mosi_baseline.json mosi_mult.json). '
+                            'If not specified, all logs in log_dir will be visualized.')
     
     args = parser.parse_args()
     
-    visualize_all(args.log_dir, args.output_dir)
+    visualize_all(args.log_dir, args.output_dir, args.log_files)
 

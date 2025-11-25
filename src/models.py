@@ -12,7 +12,9 @@ class MULTModel(nn.Module):
         """
         super(MULTModel, self).__init__()
         self.orig_d_l, self.orig_d_a, self.orig_d_v = hyp_params.orig_d_l, hyp_params.orig_d_a, hyp_params.orig_d_v
-        self.d_l, self.d_a, self.d_v = 30, 30, 30
+        self.d_l = getattr(hyp_params, 'd_l', 30)
+        self.d_a = getattr(hyp_params, 'd_a', 30)
+        self.d_v = getattr(hyp_params, 'd_v', 30)
         self.vonly = hyp_params.vonly
         self.aonly = hyp_params.aonly
         self.lonly = hyp_params.lonly
